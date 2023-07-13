@@ -1,3 +1,8 @@
+import 'dart:io';
+
+import 'package:chat_app/widgets/user_image_picker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -14,13 +19,21 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLogin = true;
+  bool _isAuthenticating = false;
 
+  String _enteredUsername = '';
   String _enteredEmail = '';
   String _enteredPassword = '';
+  File? _selectedImage;
 
   void _submit() async {
-    if (_formKey.currentState!.validate()) {
+    if (_formKey.currentState!.validate() && _isLogin ||
+        _selectedImage != null) {
       _formKey.currentState!.save();
+
+      setState(() {
+        _isAuthenticating = true;
+      });
 
       try {
         if (_isLogin) {
@@ -29,10 +42,28 @@ class _AuthScreenState extends State<AuthScreen> {
             password: _enteredPassword,
           );
         } else {
-          await _auth.createUserWithEmailAndPassword(
+          final userCred = await _auth.createUserWithEmailAndPassword(
             email: _enteredEmail,
             password: _enteredPassword,
           );
+
+          // Upload image
+          final storageRef = FirebaseStorage.instance
+              .ref()
+              .child('user_images')
+              .child('${userCred.user!.uid}.jpg');
+
+          await storageRef.putFile(_selectedImage!);
+          final imageUrl = await storageRef.getDownloadURL();
+
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userCred.user!.uid)
+              .set({
+            'email': _enteredEmail,
+            'username': _enteredUsername,
+            'image_url': imageUrl,
+          });
         }
       } on FirebaseAuthException catch (error) {
         ScaffoldMessenger.of(context).clearSnackBars();
@@ -41,6 +72,10 @@ class _AuthScreenState extends State<AuthScreen> {
             content: Text(error.message ?? 'Authentication failed.'),
           ),
         );
+
+        setState(() {
+          _isAuthenticating = false;
+        });
       }
     }
   }
@@ -77,6 +112,33 @@ class _AuthScreenState extends State<AuthScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Pick image
+                        if (!_isLogin)
+                          UserImagePicker(
+                            onPickImage: (image) {
+                              _selectedImage = image;
+                            },
+                          ),
+
+                        // Username
+                        if (!_isLogin)
+                          TextFormField(
+                            decoration: const InputDecoration(
+                              label: Text('Username'),
+                            ),
+                            enableSuggestions: false,
+                            validator: (value) {
+                              if (value == null || value.trim().length < 4) {
+                                return 'Username must at least 4 characters.';
+                              }
+                              return null;
+                            },
+                            onSaved: (newValue) {
+                              _enteredUsername = newValue!;
+                            },
+                          ),
+
+                        // Email
                         TextFormField(
                           decoration: const InputDecoration(
                             label: Text('Email Address'),
@@ -96,6 +158,8 @@ class _AuthScreenState extends State<AuthScreen> {
                             _enteredEmail = newValue!;
                           },
                         ),
+
+                        // Password
                         TextFormField(
                           decoration: const InputDecoration(
                             label: Text('Password'),
@@ -114,24 +178,35 @@ class _AuthScreenState extends State<AuthScreen> {
                           },
                         ),
                         const SizedBox(height: 12),
-                        ElevatedButton(
-                          onPressed: _submit,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                                Theme.of(context).colorScheme.primaryContainer,
+
+                        // Loading to SignIn or SignUp
+                        if (_isAuthenticating)
+                          const CircularProgressIndicator(),
+
+                        // Submit button
+                        if (!_isAuthenticating)
+                          ElevatedButton(
+                            onPressed: _submit,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context)
+                                  .colorScheme
+                                  .primaryContainer,
+                            ),
+                            child: Text(_isLogin ? 'Login' : 'Signup'),
                           ),
-                          child: Text(_isLogin ? 'Login' : 'Signup'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _isLogin = !_isLogin;
-                            });
-                          },
-                          child: Text(_isLogin
-                              ? 'Create an account'
-                              : 'I already have an account'),
-                        ),
+
+                        // Switch Signin and Signup button
+                        if (!_isAuthenticating)
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _isLogin = !_isLogin;
+                              });
+                            },
+                            child: Text(_isLogin
+                                ? 'Create an account'
+                                : 'I already have an account'),
+                          ),
                       ],
                     ),
                   ),
