@@ -6,6 +6,8 @@ This project is the one of the training projects of Flutter & Dart - The Complet
 - Firestore Database service for containing chat messages
 - Firebase Cloud Messaging and Cloud Function service for pushing notification.
 
+Additionally, I learned about device features for example, Camera and Storage.
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.
