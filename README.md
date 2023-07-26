@@ -1,6 +1,10 @@
 # chat_app
 
-This project is the one of the training projects of Flutter & Dart - The Complete Guide course.
+This project is the one of the training projects of Flutter & Dart - The Complete Guide course. From this project, I learned about Firebase services including, 
+- Authentication with Email/Password service
+- Storage service for containing user images
+- Firestore Database service for containing chat messages
+- Firebase Cloud Messaging and Cloud Function service for pushing notification.
 
 ## Getting Started
 
